@@ -71,6 +71,8 @@ jobs:
 
       - name: Generate manifest and checksum
         id: manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cd out
@@ -104,13 +106,26 @@ jobs:
           cat manifest.json
 
           # Comparaison avec le manifest de la release précédente (hors date) :
-          # si rien n'a changé, inutile de re-publier ~1 Go
+          # si rien n'a changé, inutile de re-publier ~1 Go. La présence de
+          # tous les assets attendus est aussi vérifiée (évolution du format
+          # de release : un nouvel asset doit forcer une republication)
+          changed=true
           if curl -sL --fail https://github.com/elgabo86/gwine-cache/releases/download/latest/manifest.json -o manifest-old.json 2>/dev/null \
               && cmp -s manifest.json manifest-old.json; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Manifest identique à la release précédente, publication ignorée."
-          else
+            changed=false
+            assets=$(gh release view latest --repo elgabo86/gwine-cache --json assets --jq '[.assets[].name] | join(" ")' 2>/dev/null || echo "")
+            for asset in gwine-cache.tar.xz gwine-cache.tar.xz.sha256 manifest.json install-cache.sh README.txt; do
+              if [[ " $assets " != *" $asset "* ]]; then
+                echo "Asset manquant dans la release précédente : $asset"
+                changed=true
+              fi
+            done
+          fi
+          if [ "$changed" = true ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Release identique à la précédente, publication ignorée."
           fi
 
       - name: Publish release "latest"
@@ -128,4 +143,6 @@ jobs:
             --latest=false \
             out/gwine-cache.tar.xz \
             out/gwine-cache.tar.xz.sha256 \
-            out/manifest.json
+            out/manifest.json \
+            out/gwine-cache-installer/install-cache.sh \
+            out/gwine-cache-installer/README.txt
