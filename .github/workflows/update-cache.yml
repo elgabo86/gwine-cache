@@ -117,8 +117,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release delete latest --yes --cleanup-tag --repo elgabo86/gwine-cache 2>/dev/null || true
           gh release create latest \
+            --repo elgabo86/gwine-cache \
+            --target main \
             --title "Gwine cache - $(date -u +%Y-%m-%d)" \
             --notes "$(date -u +%Y-%m-%d)" \
             --latest=false \
