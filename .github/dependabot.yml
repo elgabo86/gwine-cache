@@ -1,0 +1,7 @@
+# Mises à jour automatiques des actions GitHub (pinnées par SHA)
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"

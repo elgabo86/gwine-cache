@@ -1,0 +1,127 @@
+name: update-gwine-cache
+
+# Publie le pack cache gwine pré-construit (release "latest") :
+# 1. Assemble le gwine standalone depuis le repo gablue
+# 2. gwine --download-components (télécharge chaque composant, fail-fast)
+# 3. gwine --cachepack (valide l'exhaustivité du cache, fail-fast)
+# 4. Génération manifest.json + sha256
+# 5. Skip de la publication si le manifest est identique à la release précédente
+
+on:
+  schedule:
+    # Dimanche 03:15 UTC
+    - cron: '15 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gwine-cache
+  cancel-in-progress: true
+
+jobs:
+  build-cache:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout gablue (source du launcher gwine)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: elgabo86/gablue
+          path: gablue
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xz-utils zstd wget curl jq cabextract p7zip-full
+
+      - name: Assemble gwine standalone
+        run: ./gablue/src/gwine-launcher/build.sh
+
+      - name: Download all components (retry x3)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            echo "=== gwine --download-components (tentative $attempt/3) ==="
+            if ./gablue/src/gwine-launcher/gwine-standalone.sh --download-components; then
+              exit 0
+            fi
+            echo "Tentative $attempt échouée, attente 30s..."
+            sleep 30
+          done
+          echo "::error::Échec du téléchargement des composants après 3 tentatives"
+          exit 1
+
+      - name: Create cachepack (validation fail-fast)
+        run: |
+          mkdir -p out
+          cd out
+          ../gablue/src/gwine-launcher/gwine-standalone.sh --cachepack
+          # Fail-fast : l'archive doit exister et être cohérente (> 100 Mo)
+          if [ ! -f gwine-cache-installer/gwine-cache.tar.xz ]; then
+            echo "::error::Archive gwine-cache.tar.xz non produite"
+            exit 1
+          fi
+          size=$(stat -c%s gwine-cache-installer/gwine-cache.tar.xz)
+          if [ "$size" -lt 100000000 ]; then
+            echo "::error::Archive anormalement petite ($size octets)"
+            exit 1
+          fi
+
+      - name: Generate manifest and checksum
+        id: manifest
+        run: |
+          set -euo pipefail
+          cd out
+          cp gwine-cache-installer/gwine-cache.tar.xz .
+          sha256sum gwine-cache.tar.xz > gwine-cache.tar.xz.sha256
+
+          CACHE="$HOME/.cache/gwine"
+          latest_dir() { find "$1" -mindepth 1 -maxdepth 1 -type d -name "$2" 2>/dev/null | sort -V | tail -1 | xargs -r basename; }
+
+          runner=$(basename "$CACHE"/components/gwine/gwine-*.tar.xz 2>/dev/null | head -1 | sed 's/\.tar\.xz$//')
+          dxvk=$(latest_dir "$CACHE/components/dxvk" "dxvk-*")
+          dxvk_async=$(latest_dir "$CACHE/components/dxvk-gplasync" "dxvk*")
+          vkd3d=$(latest_dir "$CACHE/components/vkd3d" "vkd3d-proton-*")
+          nvapi=$(latest_dir "$CACHE/components/dxvk-nvapi" "dxvk-nvapi-*")
+          mono=$(basename "$CACHE"/components/wine-cache/wine-mono-*.msi 2>/dev/null | head -1 | sed 's/\.msi$//')
+          gecko64=$(basename "$CACHE"/components/wine-cache/wine-gecko-*-x86_64.msi 2>/dev/null | head -1 | sed 's/\.msi$//')
+          gecko32=$(basename "$CACHE"/components/wine-cache/wine-gecko-*-x86.msi 2>/dev/null | head -1 | sed 's/\.msi$//')
+
+          wincomponents=$(find "$CACHE/wincomponents" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort | jq -R . | jq -s .)
+
+          jq -n \
+            --arg runner "$runner" --arg dxvk "$dxvk" --arg dxvk_async "$dxvk_async" \
+            --arg vkd3d "$vkd3d" --arg nvapi "$nvapi" \
+            --arg mono "$mono" --arg gecko64 "$gecko64" --arg gecko32 "$gecko32" \
+            --argjson wincomponents "$wincomponents" \
+            '{runner: $runner, dxvk: $dxvk, dxvk_async: $dxvk_async, vkd3d: $vkd3d, nvapi: $nvapi, mono: $mono, gecko64: $gecko64, gecko32: $gecko32, wincomponents: $wincomponents}' \
+            > manifest.json
+
+          cat manifest.json
+
+          # Comparaison avec le manifest de la release précédente (hors date) :
+          # si rien n'a changé, inutile de re-publier ~1 Go
+          if curl -sL --fail https://github.com/elgabo86/gwine-cache/releases/download/latest/manifest.json -o manifest-old.json 2>/dev/null \
+              && cmp -s manifest.json manifest-old.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Manifest identique à la release précédente, publication ignorée."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish release "latest"
+        if: steps.manifest.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest \
+            --title "Gwine cache - $(date -u +%Y-%m-%d)" \
+            --notes "$(date -u +%Y-%m-%d)" \
+            --latest=false \
+            out/gwine-cache.tar.xz \
+            out/gwine-cache.tar.xz.sha256 \
+            out/manifest.json

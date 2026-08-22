@@ -1,0 +1,37 @@
+# Gwine Cache
+
+Pre-built cache pack for [Gwine](https://github.com/elgabo86/gwine) (Windows games launcher used by [Gablue](https://github.com/elgabo86/gablue)).
+
+This repository automatically publishes (every Sunday, or manually) a **`latest`** release containing:
+
+| Asset | Content |
+|-------|---------|
+| `gwine-cache.tar.xz` | The complete `~/.cache/gwine` cache (gwine runner, DXVK, DXVK-GPLAsync, VKD3D-Proton, DXVK-NVAPI, Wine Mono/Gecko, Windows components) |
+| `gwine-cache.tar.xz.sha256` | SHA256 checksum of the archive (`sha256sum -c` format) |
+| `manifest.json` | Version of each component included in the pack |
+
+## How it works
+
+1. The workflow assembles the standalone gwine from the gablue repository (`src/gwine-launcher/build.sh`)
+2. It runs `gwine --download-components` then `gwine --cachepack` (fail-fast validation: the build fails if any component is missing)
+3. It generates the manifest and checksum
+4. If the **manifest is identical** to the previous release, publishing is skipped (avoids re-pushing ~1 GB for nothing)
+5. Otherwise, the `latest` release is recreated with the new assets
+
+## Consumers
+
+Gwine (from the version including `download_cache_bundle`) automatically downloads this pack as a **single download** on first launch (`--init` with an empty cache) and during `--download-components`, with SHA256 checksum verification. If the pack is unavailable, the legacy per-component download takes over (transparent fallback).
+
+Base URL (overridable via `GWINE_CACHE_BUNDLE_URL`):
+
+```
+https://github.com/elgabo86/gwine-cache/releases/download/latest/
+```
+
+Manual deployment:
+
+```bash
+curl -LO https://github.com/elgabo86/gwine-cache/releases/download/latest/gwine-cache.tar.xz
+mkdir -p ~/.cache/gwine
+tar -xJf gwine-cache.tar.xz -C ~/.cache/gwine
+```
