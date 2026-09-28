@@ -82,7 +82,10 @@ jobs:
           CACHE="$HOME/.cache/gwine"
           latest_dir() { find "$1" -mindepth 1 -maxdepth 1 -type d -name "$2" 2>/dev/null | sort -V | tail -1 | xargs -r basename; }
 
-          runner=$(basename "$CACHE"/components/gwine/gwine-*.tar.xz 2>/dev/null | head -1 | sed 's/\.tar\.xz$//')
+          # Le cache peut contenir plusieurs archives runner (déploiement du
+          # pack par-dessus un runner fraîchement téléchargé) : prendre
+          # explicitement la plus récente, basename multi-args échoue sinon
+          runner=$(find "$CACHE/components/gwine" -maxdepth 1 -name 'gwine-*.tar.xz' 2>/dev/null | sort -V | tail -1 | xargs -r basename | sed 's/\.tar\.xz$//' || true)
           dxvk=$(latest_dir "$CACHE/components/dxvk" "dxvk-*")
           dxvk_async=$(latest_dir "$CACHE/components/dxvk-gplasync" "dxvk*")
           vkd3d=$(latest_dir "$CACHE/components/vkd3d" "vkd3d-proton-*")
