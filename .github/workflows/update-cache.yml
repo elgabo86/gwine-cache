@@ -90,6 +90,7 @@ jobs:
           dxvk_async=$(latest_dir "$CACHE/components/dxvk-gplasync" "dxvk*")
           vkd3d=$(latest_dir "$CACHE/components/vkd3d" "vkd3d-proton-*")
           nvapi=$(latest_dir "$CACHE/components/dxvk-nvapi" "dxvk-nvapi-*")
+          d7vk=$(latest_dir "$CACHE/components/d7vk" "d7vk-*")
           mono=$(basename "$CACHE"/components/wine-cache/wine-mono-*.msi 2>/dev/null | head -1 | sed 's/\.msi$//')
           gecko64=$(basename "$CACHE"/components/wine-cache/wine-gecko-*-x86_64.msi 2>/dev/null | head -1 | sed 's/\.msi$//')
           gecko32=$(basename "$CACHE"/components/wine-cache/wine-gecko-*-x86.msi 2>/dev/null | head -1 | sed 's/\.msi$//')
@@ -100,10 +101,10 @@ jobs:
 
           jq -n \
             --arg runner "$runner" --arg dxvk "$dxvk" --arg dxvk_async "$dxvk_async" \
-            --arg vkd3d "$vkd3d" --arg nvapi "$nvapi" \
+            --arg vkd3d "$vkd3d" --arg nvapi "$nvapi" --arg d7vk "$d7vk" \
             --arg mono "$mono" --arg gecko64 "$gecko64" --arg gecko32 "$gecko32" \
             --argjson wincomponents "$wincomponents" \
-            '{runner: $runner, dxvk: $dxvk, dxvk_async: $dxvk_async, vkd3d: $vkd3d, nvapi: $nvapi, mono: $mono, gecko64: $gecko64, gecko32: $gecko32, wincomponents: $wincomponents}' \
+            '{runner: $runner, dxvk: $dxvk, dxvk_async: $dxvk_async, vkd3d: $vkd3d, nvapi: $nvapi, d7vk: $d7vk, mono: $mono, gecko64: $gecko64, gecko32: $gecko32, wincomponents: $wincomponents}' \
             > manifest.json
 
           cat manifest.json

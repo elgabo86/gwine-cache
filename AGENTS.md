@@ -3,7 +3,7 @@
 ## Rôle du repo
 
 Publie le **pack cache gwine pré-construit** : une release permanente `latest` contenant le cache
-`~/.cache/gwine` complet (runner gwine, DXVK, DXVK-GPLAsync, VKD3D-Proton, DXVK-NVAPI, Wine
+`~/.cache/gwine` complet (runner gwine, DXVK, DXVK-GPLAsync, VKD3D-Proton, DXVK-NVAPI, D7VK, Wine
 Mono/Gecko, wincomponents) prêt à déployer offline. Consommateurs : `download_cache_bundle()`
 (gablue, `src/gwine-launcher/lib/cache/offline.sh`) et le build ISO de gablue
 (`installer/build.sh` télécharge les assets directement dans `/extra`).
