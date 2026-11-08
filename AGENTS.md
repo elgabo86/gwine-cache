@@ -37,10 +37,13 @@ Pipeline (chaque étape fail-fast) :
    checkout de gwine-cache → toutes les commandes `gh` doivent passer `--repo elgabo86/gwine-cache`
    explicitement, sinon elles résolvent vers gablue.
 2. **build.sh** → `gwine-standalone.sh`.
-3. **`gwine-standalone.sh --download-components`** (retry x3, sleep 30 entre tentatives). Sur un
-   runner frais : télécharge le runner, puis — cache quasi vide — déploie le **pack de la semaine
-   précédente** (`download_cache_bundle`), puis re-télécharge en unitaire ce qui est plus récent
-   que le pack.
+3. **`gwine-standalone.sh --download-components`** (retry x3, sleep 30 entre tentatives non
+   finales). Sur un runner frais : déploie d'abord le **pack de la semaine précédente**
+   (`download_cache_bundle`, wget `--tries=3`), puis installe le runner depuis l'archive du pack
+   et ne re-télécharge en unitaire que ce qui est plus récent que le pack. `--download-components`
+   ne passe donc PAS par `ensure_runner_installed` : le 08/11/2026, un timeout de la redirection
+   GitHub `/releases/latest` (requête anonyme) avant le pack a fait échouer le run ; le runner
+   vient maintenant du pack et la résolution de version réessaie 3× (8 s, pause 2 s).
 4. **`gwine-standalone.sh --cachepack`** → `out/gwine-cache-installer/` + checks locaux
    (archive existe, taille > 100 Mo).
 5. **Génération manifest + sha256** et comparaison avec le manifest de la release précédente :

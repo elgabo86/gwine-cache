@@ -47,8 +47,10 @@ jobs:
             if ./gablue/src/gwine-launcher/gwine-standalone.sh --download-components; then
               exit 0
             fi
-            echo "Tentative $attempt échouée, attente 30s..."
-            sleep 30
+            if [ "$attempt" -lt 3 ]; then
+              echo "Tentative $attempt échouée, attente 30s..."
+              sleep 30
+            fi
           done
           echo "::error::Échec du téléchargement des composants après 3 tentatives"
           exit 1
